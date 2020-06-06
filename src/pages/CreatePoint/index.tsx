@@ -1,12 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FiArrowLeft } from 'react-icons/fi';
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router-dom';
+import { Map, TileLayer, Marker } from 'react-leaflet';
+import api from '../../services/api';
 
 import './styles.css';
 
 import logo from '../../assets/logo.svg'
 
+  // array ou objeto: manualmente informar o tipo da váriavel
+interface Item {
+  id: number;
+  title: string;
+  image_url: string;  
+}
+
 const CreatePoint = () => {
+
+  const [items, setItems] = useState<Item[]>([]);
+
+  useEffect(() => {
+    api.get('items').then(res => {
+      setItems(res.data);
+      console.log(res.data);
+    });
+  }, []);
+
   return (
     <div id="page-create-point">
       <header>
@@ -61,6 +80,15 @@ const CreatePoint = () => {
             <span>Selecione o endereço no mapa</span>
           </legend>
 
+          <Map center={[-23.6575053, -46.757523]} zoom={15}>
+            <TileLayer
+              attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            <Marker position={[-23.6575053, -46.757523]} />
+          </Map>
+
           <div className="field-group">
             <div className="field">
               <label htmlFor="uf">Estado (UF)</label>
@@ -83,7 +111,19 @@ const CreatePoint = () => {
             <h2>Ítens de coleta</h2>
             <span>Selecione um ou mais ítens abaixo</span>
           </legend>
+            <ul className="items-grid">
+              {items.map(item => (
+                <li key={item.id}>
+                  <img src={item.image_url} alt={item.title} />
+                <span>{item.title}</span>
+                </li>
+              ))}
+            </ul>
         </fieldset>
+
+        <button type="submit">
+          Cadastrar ponto de coleta
+        </button>
       </form>
     </div>
   )
