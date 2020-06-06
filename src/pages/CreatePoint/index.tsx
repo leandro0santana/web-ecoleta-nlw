@@ -1,8 +1,9 @@
-import React, { useEffect, useState, ChangeEvent } from 'react';
+import React, { useEffect, useState, ChangeEvent, FormEvent } from 'react';
 import { FiArrowLeft } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
+import { Link, useHistory } from 'react-router-dom';
 import { Map, TileLayer, Marker } from 'react-leaflet';
 import axios from 'axios';
+import { LeafletMouseEvent } from 'leaflet';
 import api from '../../services/api';
 
 import './styles.css';
@@ -30,8 +31,29 @@ const CreatePoint = () => {
   const [ufs, setUfs] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
 
+  
+  const [initialPosition, setInitialPosition] = useState<[number, number]>([0, 0]);
+
+  const [formData, setFormDate] = useState({
+    name: '',
+    email: '',
+    whatsapp: '',
+  });
+
   const [selectedUf, setSelectedUf] = useState('0');
   const [selectedCity, setSelectedCity] = useState('0');
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectedPosition, setSelectedPosition] = useState<[number, number]>([0, 0]);
+
+  const history = useHistory();
+
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(position => {
+      const { latitude, longitude } = position.coords;
+
+      setInitialPosition([latitude, longitude]);
+    });
+  }, []);
 
   useEffect(() => {
     api.get('items').then(res => {
@@ -75,6 +97,58 @@ const CreatePoint = () => {
     setSelectedCity(city);
   }
 
+  function handleMapClick(event: LeafletMouseEvent) {
+    setSelectedPosition([
+      event.latlng.lat,
+      event.latlng.lng,
+    ])
+  }
+
+  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const {name , value } = event.target;
+
+    setFormDate({ ...formData, [name]: value });
+  }
+
+  function handleSelectItems(id: number) {
+    const alreadySelected = selectedItems.findIndex(item => item === id);
+
+    if(alreadySelected >= 0) {
+      const filteredItems = selectedItems.filter(item => item !== id);
+
+      setSelectedItems(filteredItems);
+    } else {
+      setSelectedItems([ ...selectedItems, id ]);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+
+    const { name, email, whatsapp } =formData;
+    const uf = selectedUf;
+    const city = selectedCity;
+    const [latitude, longitude] = selectedPosition;
+    const items = selectedItems;
+
+    const data = {
+      name,
+      email,
+      whatsapp,
+      uf,
+      city,
+      latitude,
+      longitude,
+      items
+    };
+
+    await api.post('points', data);
+
+    alert('Ponto de coleta Criar');
+
+    history.push('/');
+  }
+
   return (
     <div id="page-create-point">
       <header>
@@ -85,7 +159,7 @@ const CreatePoint = () => {
           Voltar para home
         </Link>
       </header>
-      <form>
+      <form onSubmit={handleSubmit}>
         <h1>Cadastro do <br /> ponto de coleta</h1>
 
         <fieldset>
@@ -99,6 +173,7 @@ const CreatePoint = () => {
               type="text"
               id="name"
               name="name"
+              onChange={handleInputChange}
             />
           </div>
 
@@ -109,6 +184,7 @@ const CreatePoint = () => {
                 type="email"
                 id="email"
                 name="email"
+                onChange={handleInputChange}
               />
             </div>
 
@@ -118,6 +194,7 @@ const CreatePoint = () => {
                 type="text"
                 id="whatsapp"
                 name="whatsapp"
+                onChange={handleInputChange}
               />
             </div>
           </div>
@@ -129,13 +206,13 @@ const CreatePoint = () => {
             <span>Selecione o endereço no mapa</span>
           </legend>
 
-          <Map center={[-23.6575053, -46.757523]} zoom={15}>
+          <Map center={initialPosition} zoom={15} onClick={handleMapClick}>
             <TileLayer
               attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            <Marker position={[-23.6575053, -46.757523]} />
+            <Marker position={selectedPosition} />
           </Map>
 
           <div className="field-group">
@@ -178,7 +255,11 @@ const CreatePoint = () => {
           </legend>
             <ul className="items-grid">
               {items.map(item => (
-                <li key={item.id}>
+                <li 
+                  key={item.id} 
+                  onClick={() => handleSelectItems(item.id)}
+                  className={selectedItems.includes(item.id) ? 'selected': ''}
+                >
                   <img src={item.image_url} alt={item.title} />
                 <span>{item.title}</span>
                 </li>
